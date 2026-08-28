@@ -71,7 +71,6 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
         }
 
         input[type="date"] {
@@ -122,19 +121,20 @@
             color: var(--primary-color);
             font-size: 16px;
             margin-bottom: 5px;
+            font-weight: bold;
         }
 
         .exercise-subtitle {
             font-size: 12px;
             color: var(--text-muted);
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
 
         /* Set Row */
         .set-row {
             display: flex;
             align-items: center;
-            gap: 10px;
+            justify-content: space-between;
             margin-bottom: 8px;
         }
 
@@ -182,6 +182,7 @@
 </head>
 <body>
 
+    <!-- Rest Timer -->
     <div class="timer-header">
         <div>
             <div style="font-size: 10px; color: var(--text-muted);">REST TIMER</div>
@@ -193,16 +194,18 @@
         </div>
     </div>
 
+    <!-- Calendar Log Header -->
     <div class="calendar-card">
         <div class="date-picker-row">
             <div>
-                <span style="font-size: 12px; color: var(--text-muted); display: block;">SELECTED DATE</span>
+                <span style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 4px;">SELECT DATE</span>
                 <input type="date" id="workoutDate" onchange="loadDateData()">
             </div>
-            <div id="loggedBadge" style="font-size: 12px; color: var(--primary-color); display: none;">✓ Logged</div>
+            <div id="loggedBadge" style="font-size: 13px; color: var(--primary-color); font-weight: bold; display: none;">✓ Logged</div>
         </div>
     </div>
 
+    <!-- Workout Program Selector -->
     <div class="day-selector">
         <button class="day-btn active" onclick="selectDay(0)">Day 1: Upper A</button>
         <button class="day-btn" onclick="selectDay(1)">Day 2: Lower A</button>
@@ -210,6 +213,7 @@
         <button class="day-btn" onclick="selectDay(3)">Day 4: Lower B</button>
     </div>
 
+    <!-- Exercise Fields Container -->
     <div id="exerciseContainer"></div>
 
     <button class="save-btn" onclick="saveWorkout()">Save Log for Selected Date</button>
@@ -246,4 +250,151 @@
                     { name: "Dumbbell Lateral Raises", sets: 4, target: "12-15 reps" },
                     { name: "Dumbbell Incline Chest Flyes", sets: 3, target: "12-15 reps" },
                     { name: "Dumbbell Rear Delt Flyes", sets: 3, target: "15 reps" },
-                    { name: "Hammer Curls / Skullcrushers",
+                    { name: "Hammer Curls / Skullcrushers", sets: 3, target: "12 reps" }
+                ]
+            },
+            {
+                name: "Day 4: Lower B",
+                exercises: [
+                    { name: "Smith Machine RDLs", sets: 3, target: "8-10 reps" },
+                    { name: "Matrix Seated Leg Curls", sets: 3, target: "10-12 reps" },
+                    { name: "Bulgarian Split Squats", sets: 3, target: "8-10 reps" },
+                    { name: "Matrix Leg Extensions", sets: 3, target: "12-15 reps" },
+                    { name: "Dumbbell Goblet Squats", sets: 3, target: "12-15 reps" },
+                    { name: "Calf Raises / Russian Twists", sets: 3, target: "15-20 reps" }
+                ]
+            }
+        ];
+
+        let currentDayIndex = 0;
+        let timerSeconds = 60;
+        let timerInterval = null;
+
+        // Set default date picker to today YYYY-MM-DD
+        const todayStr = new Date().toISOString().split('T')[0];
+        document.getElementById('workoutDate').value = todayStr;
+
+        function selectDay(index) {
+            currentDayIndex = index;
+            document.querySelectorAll('.day-btn').forEach((btn, i) => {
+                btn.classList.toggle('active', i === index);
+            });
+            renderWorkoutForm();
+        }
+
+        function renderWorkoutForm() {
+            const container = document.getElementById('exerciseContainer');
+            container.innerHTML = '';
+            const selectedDate = document.getElementById('workoutDate').value;
+
+            // Retrieve saved data for selected date and day program
+            const savedData = JSON.parse(localStorage.getItem(`workout_${selectedDate}_d${currentDayIndex}`) || '{}');
+            
+            const badge = document.getElementById('loggedBadge');
+            badge.style.display = Object.keys(savedData).length > 0 ? 'inline' : 'none';
+
+            const day = workouts[currentDayIndex];
+            day.exercises.forEach((ex, exIdx) => {
+                const card = document.createElement('div');
+                card.className = 'exercise-card';
+                
+                let setsHTML = '';
+                for (let s = 1; s <= ex.sets; s++) {
+                    const weightVal = savedData[`e${exIdx}_s${s}_w`] || '';
+                    const repsVal = savedData[`e${exIdx}_s${s}_r`] || '';
+
+                    setsHTML += `
+                        <div class="set-row">
+                            <span class="set-label">Set ${s}</span>
+                            <div class="input-group">
+                                <input type="number" placeholder="0" id="w_${exIdx}_${s}" value="${weightVal}">
+                                <span class="unit">kg</span>
+                            </div>
+                            <div class="input-group">
+                                <input type="number" placeholder="0" id="r_${exIdx}_${s}" value="${repsVal}">
+                                <span class="unit">reps</span>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                card.innerHTML = `
+                    <div class="exercise-title">${ex.name}</div>
+                    <div class="exercise-subtitle">${ex.sets} Sets • Target: ${ex.target}</div>
+                    ${setsHTML}
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function saveWorkout() {
+            const selectedDate = document.getElementById('workoutDate').value;
+            if (!selectedDate) {
+                alert('Please select a date.');
+                return;
+            }
+
+            const day = workouts[currentDayIndex];
+            const logObj = {};
+
+            day.exercises.forEach((ex, exIdx) => {
+                for (let s = 1; s <= ex.sets; s++) {
+                    const wElem = document.getElementById(`w_${exIdx}_${s}`);
+                    const rElem = document.getElementById(`r_${exIdx}_${s}`);
+                    if (wElem && wElem.value !== '') logObj[`e${exIdx}_s${s}_w`] = wElem.value;
+                    if (rElem && rElem.value !== '') logObj[`e${exIdx}_s${s}_r`] = rElem.value;
+                }
+            });
+
+            localStorage.setItem(`workout_${selectedDate}_d${currentDayIndex}`, JSON.stringify(logObj));
+            document.getElementById('loggedBadge').style.display = 'inline';
+            alert(`Workout logged successfully for ${selectedDate}!`);
+        }
+
+        function loadDateData() {
+            renderWorkoutForm();
+        }
+
+        /* Rest Timer Logic */
+        function toggleTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+                document.getElementById('timerStartBtn').innerText = 'Start';
+            } else {
+                document.getElementById('timerStartBtn').innerText = 'Pause';
+                timerInterval = setInterval(() => {
+                    timerSeconds--;
+                    updateTimerDisplay();
+                    if (timerSeconds <= 0) {
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                        document.getElementById('timerStartBtn').innerText = 'Start';
+                        alert("60 Seconds Rest Finished!");
+                        resetTimer();
+                    }
+                }, 1000);
+            }
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            timerInterval = null;
+            timerSeconds = 60;
+            document.getElementById('timerStartBtn').innerText = 'Start';
+            updateTimerDisplay();
+        }
+
+        function updateTimerDisplay() {
+            const mins = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
+            const secs = String(timerSeconds % 60).padStart(2, '0');
+            document.getElementById('timerDisplay').innerText = `${mins}:${secs}`;
+        }
+
+        // Initialize workout container on load
+        window.onload = function() {
+            renderWorkoutForm();
+        };
+    </script>
+</body>
+</html>
