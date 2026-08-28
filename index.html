@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hypertrophy Tracker</title>
+    <title>Hypertrophy Progress Tracker</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -23,11 +23,9 @@
             padding-bottom: 80px;
         }
 
-        h1, h2, h3 {
-            margin: 5px 0;
-        }
+        h2, h3 { margin: 5px 0; }
 
-        /* Fixed Timer Header */
+        /* Timer Header */
         .timer-header {
             position: sticky;
             top: 0;
@@ -54,13 +52,39 @@
             background-color: var(--primary-color);
             color: #000;
             border: none;
-            padding: 8px 16px;
+            padding: 8px 14px;
             border-radius: 6px;
             font-weight: bold;
             cursor: pointer;
         }
 
-        /* Day Selection */
+        /* Calendar Section */
+        .calendar-card {
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 1px solid var(--border-color);
+        }
+
+        .date-picker-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        input[type="date"] {
+            background-color: #2a2a2a;
+            border: 1px solid var(--border-color);
+            color: var(--primary-color);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: bold;
+        }
+
+        /* Day Selector */
         .day-selector {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -74,7 +98,7 @@
             border: 1px solid var(--border-color);
             padding: 12px;
             border-radius: 8px;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: bold;
             cursor: pointer;
         }
@@ -158,10 +182,9 @@
 </head>
 <body>
 
-    <!-- 60-Second Rest Stopwatch Header -->
     <div class="timer-header">
         <div>
-            <div style="font-size: 11px; color: var(--text-muted);">REST TIMER</div>
+            <div style="font-size: 10px; color: var(--text-muted);">REST TIMER</div>
             <div class="timer-display" id="timerDisplay">01:00</div>
         </div>
         <div>
@@ -170,10 +193,16 @@
         </div>
     </div>
 
-    <h2>Hypertrophy Log</h2>
-    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 15px;">Target: 77kg Mass Building</p>
+    <div class="calendar-card">
+        <div class="date-picker-row">
+            <div>
+                <span style="font-size: 12px; color: var(--text-muted); display: block;">SELECTED DATE</span>
+                <input type="date" id="workoutDate" onchange="loadDateData()">
+            </div>
+            <div id="loggedBadge" style="font-size: 12px; color: var(--primary-color); display: none;">✓ Logged</div>
+        </div>
+    </div>
 
-    <!-- Workout Selector -->
     <div class="day-selector">
         <button class="day-btn active" onclick="selectDay(0)">Day 1: Upper A</button>
         <button class="day-btn" onclick="selectDay(1)">Day 2: Lower A</button>
@@ -181,13 +210,11 @@
         <button class="day-btn" onclick="selectDay(3)">Day 4: Lower B</button>
     </div>
 
-    <!-- Container for Exercise Cards -->
     <div id="exerciseContainer"></div>
 
-    <button class="save-btn" onclick="saveWorkout()">Save Workout Log</button>
+    <button class="save-btn" onclick="saveWorkout()">Save Log for Selected Date</button>
 
     <script>
-        // Workout Data Definition
         const workouts = [
             {
                 name: "Day 1: Upper A",
@@ -219,123 +246,4 @@
                     { name: "Dumbbell Lateral Raises", sets: 4, target: "12-15 reps" },
                     { name: "Dumbbell Incline Chest Flyes", sets: 3, target: "12-15 reps" },
                     { name: "Dumbbell Rear Delt Flyes", sets: 3, target: "15 reps" },
-                    { name: "Hammer Curls / Skullcrushers", sets: 3, target: "12 reps" }
-                ]
-            },
-            {
-                name: "Day 4: Lower B",
-                exercises: [
-                    { name: "Smith Machine RDLs", sets: 3, target: "8-10 reps" },
-                    { name: "Matrix Seated Leg Curls", sets: 3, target: "10-12 reps" },
-                    { name: "Bulgarian Split Squats", sets: 3, target: "8-10 reps" },
-                    { name: "Matrix Leg Extensions", sets: 3, target: "12-15 reps" },
-                    { name: "Dumbbell Goblet Squats", sets: 3, target: "12-15 reps" },
-                    { name: "Calf Raises / Russian Twists", sets: 3, target: "15-20 reps" }
-                ]
-            }
-        ];
-
-        let currentDayIndex = 0;
-        let timerSeconds = 60;
-        let timerInterval = null;
-
-        // Render Workout UI
-        function selectDay(index) {
-            currentDayIndex = index;
-            document.querySelectorAll('.day-btn').forEach((btn, i) => {
-                btn.classList.toggle('active', i === index);
-            });
-
-            const container = document.getElementById('exerciseContainer');
-            container.innerHTML = '';
-
-            const day = workouts[index];
-            day.exercises.forEach((ex, exIdx) => {
-                const card = document.createElement('div');
-                card.className = 'exercise-card';
-                
-                let setsHTML = '';
-                for (let s = 1; s <= ex.sets; s++) {
-                    const savedWeight = localStorage.getItem(`d${index}_e${exIdx}_s${s}_w`) || '';
-                    const savedReps = localStorage.getItem(`d${index}_e${exIdx}_s${s}_r`) || '';
-
-                    setsHTML += `
-                        <div class="set-row">
-                            <span class="set-label">Set ${s}</span>
-                            <div class="input-group">
-                                <input type="number" placeholder="0" id="w_${index}_${exIdx}_${s}" value="${savedWeight}">
-                                <span class="unit">kg</span>
-                            </div>
-                            <div class="input-group">
-                                <input type="number" placeholder="0" id="r_${index}_${exIdx}_${s}" value="${savedReps}">
-                                <span class="unit">reps</span>
-                            </div>
-                        </div>
-                    `;
-                }
-
-                card.innerHTML = `
-                    <div class="exercise-title">${ex.name}</div>
-                    <div class="exercise-subtitle">${ex.sets} Sets • Target: ${ex.target}</div>
-                    ${setsHTML}
-                `;
-                container.appendChild(card);
-            });
-        }
-
-        // Timer Functions
-        function toggleTimer() {
-            if (timerInterval) {
-                clearInterval(timerInterval);
-                timerInterval = null;
-                document.getElementById('timerStartBtn').innerText = 'Start';
-            } else {
-                document.getElementById('timerStartBtn').innerText = 'Pause';
-                timerInterval = setInterval(() => {
-                    timerSeconds--;
-                    updateTimerDisplay();
-                    if (timerSeconds <= 0) {
-                        clearInterval(timerInterval);
-                        timerInterval = null;
-                        document.getElementById('timerStartBtn').innerText = 'Start';
-                        alert("60 Seconds Rest Finished!");
-                        resetTimer();
-                    }
-                }, 1000);
-            }
-        }
-
-        function resetTimer() {
-            clearInterval(timerInterval);
-            timerInterval = null;
-            timerSeconds = 60;
-            document.getElementById('timerStartBtn').innerText = 'Start';
-            updateTimerDisplay();
-        }
-
-        function updateTimerDisplay() {
-            const mins = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
-            const secs = String(timerSeconds % 60).padStart(2, '0');
-            document.getElementById('timerDisplay').innerText = `${mins}:${secs}`;
-        }
-
-        // Save Data to Local Storage
-        function saveWorkout() {
-            const day = workouts[currentDayIndex];
-            day.exercises.forEach((ex, exIdx) => {
-                for (let s = 1; s <= ex.sets; s++) {
-                    const wVal = document.getElementById(`w_${currentDayIndex}_${exIdx}_${s}`).value;
-                    const rVal = document.getElementById(`r_${currentDayIndex}_${exIdx}_${s}`).value;
-
-                    localStorage.setItem(`d${currentDayIndex}_e${exIdx}_s${s}_w`, wVal);
-                    localStorage.setItem(`d${currentDayIndex}_e${exIdx}_s${s}_r`, rVal);
-                }
-            });
-            alert('Workout Log Saved Successfully!');
-        }
-
-        // Initialize First Day
-        selectDay(0);
-    </script>
-</body>
-</html>
+                    { name: "Hammer Curls / Skullcrushers",
